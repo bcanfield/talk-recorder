@@ -1,6 +1,8 @@
 # talk-recorder
 
-Talk recording and local transcription for macOS
+### Talk recording and local transcription for macOS
+
+<img src="screenshot.png" alt="screenshot" width="860">
 
 ```sh
 brew install ffmpeg whisper-cpp
