@@ -152,6 +152,9 @@ check_mic() {
         exit 1
       fi
       log "WARNING: mic is silent; recording anyway (ALLOW_SILENT_MIC=1)" ;;
+    -[3-8][0-9]*)
+      log "WARNING: mic is very quiet (peak below -30 dB). Move closer to the"
+      log "speaker or raise the input gain. Recording anyway." ;;
   esac
 }
 
@@ -178,10 +181,13 @@ transcribe_one() {
   [ "$size" -lt "$MIN_SEGMENT_BYTES" ] && return 0
   # whisper-cli rejects FLAC segments that lack a final header, and those from
   # a crash are truncated too. ffmpeg decodes both, so hand whisper a WAV.
-  if ffmpeg -nostdin -loglevel error -y -i "$src" -ar 16000 -ac 1 \
-      -c:a pcm_s16le "$out.part.wav" >>"$LOG" 2>&1 \
+  # The filters lift a quiet room mic (about -47 LUFS) to speech level; without
+  # them whisper writes [Inaudible]. -mc 0 stops repetition loops.
+  if ffmpeg -nostdin -loglevel error -y -i "$src" \
+      -af "highpass=f=100,lowpass=f=7500,dynaudnorm=f=150:g=15:p=0.9:m=40,loudnorm=I=-18:TP=-2:LRA=11" \
+      -ar 16000 -ac 1 -c:a pcm_s16le "$out.part.wav" >>"$LOG" 2>&1 \
       && nice -n 15 whisper-cli -m "$MODEL_FILE" -f "$out.part.wav" -l en \
-      -t "$THREADS" -np -nt -otxt -of "$out.part" >>"$LOG" 2>&1 \
+      -t "$THREADS" -mc 0 -np -nt -otxt -of "$out.part" >>"$LOG" 2>&1 \
       && [ -f "$out.part.txt" ]; then
     rm -f "$out.part.wav"
     mv "$out.part.txt" "$out.txt"
